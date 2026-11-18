@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Assist Voice",
+        "description": "Expose a Home Assistant STT entity to Wyoming and route conversations to selected personalities.",
+        "data": {
+          "stt_entity": "Bridge target STT entity (e.g. Home Assistant Cloud)",
+          "speaker_stt_entity": "Speaker ID STT entity (optional)",
+          "stt_response_timeout": "Maximum seconds to wait after audio ends",
+          "backends": "Personality conversation agents",
+          "listen_host": "Wyoming listen address",
+          "listen_port": "Wyoming listen port"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Assist Voice",
+        "data": {
+          "stt_entity": "Bridge target STT entity (e.g. Home Assistant Cloud)",
+          "speaker_stt_entity": "Speaker ID STT entity (optional)",
+          "stt_response_timeout": "Maximum seconds to wait after audio ends",
+          "backends": "Personality conversation agents",
+          "listen_host": "Wyoming listen address",
+          "listen_port": "Wyoming listen port"
+        }
+      }
+    },
+    "error": {
+      "invalid_backends": "Select at least one distinct personality.",
+      "routing_loop": "Do not select the router or Speaker ID agent as a backend.",
+      "stt_loop": "Do not select Speaker ID as the bridge's STT target."
+    },
+    "abort": {
+      "already_configured": "Assist Voice is already configured."
+    }
+  },
+  "services": {
+    "rotate": {
+      "name": "Rotate personality",
+      "description": "Randomly select a different configured personality for new conversations."
+    }
+  }
+}

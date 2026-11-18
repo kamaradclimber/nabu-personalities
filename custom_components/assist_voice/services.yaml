@@ -1,0 +1,3 @@
+rotate:
+  name: Rotate personality
+  description: Randomly select a different configured personality for new conversations.
