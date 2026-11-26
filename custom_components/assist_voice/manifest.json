@@ -5,6 +5,7 @@
   "config_flow": true,
   "documentation": "https://github.com/kamaradclimber/nabu-personalities",
   "dependencies": [
+    "assist_pipeline",
     "button",
     "conversation",
     "sensor",

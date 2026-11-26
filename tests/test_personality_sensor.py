@@ -1,5 +1,6 @@
 """Assist Voice device controls and personality diagnostics."""
 
+from homeassistant.components import assist_pipeline
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType
@@ -31,8 +32,12 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     button_id = entity_registry.async_get_entity_id(
         "button", DOMAIN, f"{entry.entry_id}-rotate-personality"
     )
+    topology_id = entity_registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}-pipeline-topology"
+    )
     assert sensor_id is not None
     assert button_id is not None
+    assert topology_id == "sensor.assist_voice_pipeline_topology"
 
     state = hass.states.get(sensor_id)
     assert state is not None
@@ -41,6 +46,25 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     assert state.attributes["backends"] == backend_ids
     assert state.attributes["backend_names"] == dict(zip(backend_ids, backend_names))
 
+    pipeline = assist_pipeline.async_get_pipeline(hass)
+    topology_state = hass.states.get(topology_id)
+    assert topology_state is not None
+    assert topology_state.state == pipeline.name
+    assert topology_state.attributes["pipeline_id"] == pipeline.id
+    assert topology_state.attributes["pipeline_name"] == pipeline.name
+    assert [stage["stage"] for stage in topology_state.attributes["stages"]] == [
+        "Wake word",
+        "Speech-to-text",
+        "Conversation",
+        "Text-to-speech",
+    ]
+    assert (
+        topology_state.attributes["assist_voice"]["personality_router"][
+            "current_backend"
+        ]["entity_id"]
+        == backend_ids[0]
+    )
+
     await hass.services.async_call(
         "button", "press", {"entity_id": button_id}, blocking=True
     )
@@ -48,6 +72,14 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     assert state is not None
     assert state.state == backend_names[1]
     assert state.attributes["current_backend"] == backend_ids[1]
+    topology_state = hass.states.get(topology_id)
+    assert topology_state is not None
+    assert (
+        topology_state.attributes["assist_voice"]["personality_router"][
+            "current_backend"
+        ]["entity_id"]
+        == backend_ids[1]
+    )
 
     # Display-name changes on configured backends refresh diagnostic attributes.
     hass.states.async_set(backend_ids[1], "unknown", {"friendly_name": "Updated Two"})
@@ -68,7 +100,7 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     config_entry_entities = er.async_entries_for_config_entry(
         entity_registry, entry.entry_id
     )
-    assert len(config_entry_entities) == 4
+    assert len(config_entry_entities) == 5
     assert {entity.device_id for entity in config_entry_entities} == {device.id}
 
     assert await hass.config_entries.async_unload(entry.entry_id)

@@ -43,6 +43,9 @@
     "sensor": {
       "current_personality": {
         "name": "Current personality"
+      },
+      "pipeline_topology": {
+        "name": "Voice pipeline topology"
       }
     }
   },

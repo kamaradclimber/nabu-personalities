@@ -18,6 +18,29 @@ Select `stt.assist_voice_speaker_id` as the test pipeline's STT, not the upstrea
 
 Invoke `assist_voice.rotate` from an HA automation or the Actions developer tool. Rotation requires at least two configured agents and persists across restarts. Assist Voice's entities are grouped under one **Assist Voice** service device. Its **Rotate personality** button selects a different backend for new conversations, and the diagnostic **Current personality** sensor reports the selected backend's friendly name. Sensor attributes include the selected backend entity ID (`current_backend`), all configured backend entity IDs (`backends`), and a mapping from backend IDs to friendly names (`backend_names`). Existing conversations normally remain on their original agent until they expire (24 hours), are evicted, or HA/the integration restarts; after that, start a new conversation. HA-supplied session IDs that are no longer in the router's memory may be treated as new conversations. Agent failures do not trigger an automatic switch. Router attributes also show the selected backend and eligible backends.
 
+The diagnostic **Voice pipeline topology** sensor visualizes Home Assistant's preferred Assist pipeline and the integration's STT/personality routes. It refreshes the preferred pipeline view once a minute. This prototype does not discover pipelines assigned individually to satellites.
+
+To render it as a native Markdown dashboard card, add:
+
+```yaml
+type: markdown
+title: Voice pipeline
+content: |
+  {% set entity = 'sensor.assist_voice_pipeline_topology' %}
+  {% set voice = state_attr(entity, 'assist_voice') %}
+  ## {{ state_attr(entity, 'pipeline_name') }}
+
+  {{ state_attr(entity, 'topology') }}
+
+  {% if voice['stt_path_configured'] %}
+  **Assist Voice STT route:** {{ voice['guarded_stt']['name'] }} → {{ voice['speaker_id_stt']['name'] }} → Wyoming ({{ voice['wyoming_bridge']['host'] }}:{{ voice['wyoming_bridge']['port'] }}) → {{ voice['wyoming_bridge']['upstream_stt']['name'] }}
+  {% else %}
+  **Assist Voice STT route:** not active in this pipeline; it uses a different STT engine.
+  {% endif %}
+
+  **Personality router:** {{ voice['personality_router']['entity']['name'] }} → {{ voice['personality_router']['current_backend']['name'] }} (configure the Speaker ID conversation agent to target the router when applicable).
+```
+
 The integration's icon and logo are in `custom_components/assist_voice/brand/`. `uv run --with pillow python custom_components/assist_voice/brand/generate.py` regenerates the current simple waveform artwork.
 
 ## Security and limitations
