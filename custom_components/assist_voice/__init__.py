@@ -11,6 +11,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 from wyoming.server import AsyncTcpServer
 
 from .bridge import BridgeHandler
@@ -22,6 +23,7 @@ from .const import (
     SERVICE_ROTATE,
 )
 from .conversation import PersonalityRouter
+from .frontend import async_setup as async_setup_frontend
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [
@@ -30,6 +32,12 @@ PLATFORMS = [
     Platform.SENSOR,
     Platform.STT,
 ]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the optional Lovelace card resource endpoint."""
+    await async_setup_frontend(hass)
+    return True
 
 
 @dataclass

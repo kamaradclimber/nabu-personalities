@@ -8,6 +8,7 @@
     "assist_pipeline",
     "button",
     "conversation",
+    "http",
     "sensor",
     "stt"
   ],

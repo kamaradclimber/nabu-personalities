@@ -70,6 +70,15 @@ class GuardedSpeakerStt(stt.SpeechToTextEntity):
         )
 
     @property
+    def extra_state_attributes(self) -> dict[str, int | str]:
+        """Expose the upstream entity and timeout limits for troubleshooting."""
+        return {
+            "upstream_entity": self._target_id,
+            "max_request_seconds": MAX_REQUEST_SECONDS,
+            "response_after_audio_seconds": self._response_timeout,
+        }
+
+    @property
     def available(self) -> bool:
         target = self._target()
         return target is not None and target.available

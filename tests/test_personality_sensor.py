@@ -11,7 +11,7 @@ from custom_components.assist_voice.const import DOMAIN
 
 
 async def test_sensor_tracks_named_personality_and_device_entities(
-    hass, entry, socket_enabled
+    hass, entry, socket_enabled, hass_client_no_auth
 ):
     assert await async_setup_component(hass, "conversation", {})
     backend_ids = ["conversation.personality_one", "conversation.personality_two"]
@@ -24,6 +24,11 @@ async def test_sensor_tracks_named_personality_and_device_entities(
         entry, data={**entry.data, "backends": backend_ids}
     )
     assert await hass.config_entries.async_setup(entry.entry_id)
+    client = await hass_client_no_auth()
+    card_response = await client.get("/api/assist_voice/pipeline-card.js")
+    assert card_response.status == 200
+    assert "javascript" in card_response.content_type
+    assert "assist-voice-pipeline-card" in await card_response.text()
 
     entity_registry = er.async_get(hass)
     sensor_id = entity_registry.async_get_entity_id(
@@ -58,6 +63,10 @@ async def test_sensor_tracks_named_personality_and_device_entities(
         "Conversation",
         "Text-to-speech",
     ]
+    assert topology_state.attributes["assist_voice"]["timeouts"] == {
+        "max_request_seconds": 120,
+        "response_after_audio_seconds": 30,
+    }
     assert (
         topology_state.attributes["assist_voice"]["personality_router"][
             "current_backend"

@@ -20,26 +20,18 @@ Invoke `assist_voice.rotate` from an HA automation or the Actions developer tool
 
 The diagnostic **Voice pipeline topology** sensor visualizes Home Assistant's preferred Assist pipeline and the integration's STT/personality routes. It refreshes the preferred pipeline view once a minute. This prototype does not discover pipelines assigned individually to satellites.
 
-To render it as a native Markdown dashboard card, add:
+For a clickable diagram, first add the card resource in **Settings → Dashboards → Resources**:
+
+- URL: `/api/assist_voice/pipeline-card.js`
+- Resource type: **JavaScript Module**
+
+Then add a dashboard card with:
 
 ```yaml
-type: markdown
-title: Voice pipeline
-content: |
-  {% set entity = 'sensor.assist_voice_pipeline_topology' %}
-  {% set voice = state_attr(entity, 'assist_voice') %}
-  ## {{ state_attr(entity, 'pipeline_name') }}
-
-  {{ state_attr(entity, 'topology') }}
-
-  {% if voice['stt_path_configured'] %}
-  **Assist Voice STT route:** {{ voice['guarded_stt']['name'] }} → {{ voice['speaker_id_stt']['name'] }} → Wyoming ({{ voice['wyoming_bridge']['host'] }}:{{ voice['wyoming_bridge']['port'] }}) → {{ voice['wyoming_bridge']['upstream_stt']['name'] }}
-  {% else %}
-  **Assist Voice STT route:** not active in this pipeline; it uses a different STT engine.
-  {% endif %}
-
-  **Personality router:** {{ voice['personality_router']['entity']['name'] }} → {{ voice['personality_router']['current_backend']['name'] }} (configure the Speaker ID conversation agent to target the router when applicable).
+type: custom:assist-voice-pipeline-card
 ```
+
+The nodes open the relevant entity's more-info panel. The diagram calls out the timeout limits, shows that the Speaker ID integration calls its server over HTTP, and traces the server's Wyoming handoff to the configured HA STT provider. The Rotate personality button works directly from the diagram. If the preferred pipeline doesn't use Assist Voice's guarded STT entity, that route is shown as inactive.
 
 The integration's icon and logo are in `custom_components/assist_voice/brand/`. `uv run --with pillow python custom_components/assist_voice/brand/generate.py` regenerates the current simple waveform artwork.
 

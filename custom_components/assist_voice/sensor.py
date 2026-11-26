@@ -17,15 +17,19 @@ from homeassistant.helpers.event import async_track_state_change_event
 from .const import (
     CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
+    CONF_RESPONSE_TIMEOUT,
     CONF_SPEAKER_STT,
     CONF_STT_ENTITY,
     DEFAULT_LISTEN_HOST,
     DEFAULT_LISTEN_PORT,
+    DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_SPEAKER_STT,
+    DOMAIN,
     GUARDED_STT_ENTITY,
 )
 from .conversation import PersonalityRouter
 from .device import assist_voice_device_info
+from .stt import MAX_REQUEST_SECONDS
 
 SCAN_INTERVAL = timedelta(minutes=1)
 
@@ -188,6 +192,12 @@ class PipelineTopologySensor(SensorEntity):
             "topology": " → ".join(stage_labels),
             "assist_voice": {
                 "stt_path_configured": pipeline.stt_engine == GUARDED_STT_ENTITY,
+                "timeouts": {
+                    "max_request_seconds": MAX_REQUEST_SECONDS,
+                    "response_after_audio_seconds": self._entry.data.get(
+                        CONF_RESPONSE_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT
+                    ),
+                },
                 "guarded_stt": _entity_details(self.hass, GUARDED_STT_ENTITY),
                 "speaker_id_stt": _entity_details(self.hass, speaker_stt),
                 "wyoming_bridge": {
@@ -197,6 +207,12 @@ class PipelineTopologySensor(SensorEntity):
                         self.hass, self._entry.data[CONF_STT_ENTITY]
                     ),
                 },
+                "rotate_button": _entity_details(
+                    self.hass,
+                    er.async_get(self.hass).async_get_entity_id(
+                        "button", DOMAIN, f"{self._entry.entry_id}-rotate-personality"
+                    ),
+                ),
                 "personality_router": {
                     "entity": _entity_details(self.hass, self._router.entity_id),
                     "pipeline_uses_router_directly": (
