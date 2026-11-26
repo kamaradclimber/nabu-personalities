@@ -85,19 +85,34 @@ class PersonalityRouter(conversation.ConversationEntity):
         self._personality_listeners.remove(listener)
 
     async def rotate(self) -> None:
+        """Select a random alternative personality for new conversations."""
         async with self.rotate_lock:
             choices = [agent for agent in self.backends if agent != self.current]
             if not choices:
                 raise HomeAssistantError(
                     "At least two different personalities are required to rotate"
                 )
-            selected = secrets.choice(choices)
-            # Persist first: a write failure must not result in an unrecorded selection.
-            await self.store.async_save({"backend": selected})
-            self.current = selected
-            self.async_write_ha_state()
-            for listener in self._personality_listeners:
-                listener()
+            await self._async_select_personality(secrets.choice(choices))
+
+    async def select_personality(self, backend: str) -> None:
+        """Select a configured backend for new conversations."""
+        async with self.rotate_lock:
+            if backend not in self.backends:
+                raise HomeAssistantError(
+                    f"{backend} is not a configured personality backend"
+                )
+            await self._async_select_personality(backend)
+
+    async def _async_select_personality(self, backend: str) -> None:
+        """Persist a selection before publishing the change to entities."""
+        if backend == self.current:
+            return
+        # Persist first: a write failure must not result in an unrecorded selection.
+        await self.store.async_save({"backend": backend})
+        self.current = backend
+        self.async_write_ha_state()
+        for listener in self._personality_listeners:
+            listener()
 
     def _prune(self, *, for_insert: bool = False) -> None:
         now = time.monotonic()

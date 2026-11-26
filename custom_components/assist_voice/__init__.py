@@ -6,21 +6,25 @@ import asyncio
 from dataclasses import dataclass
 from functools import partial
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import selector
 from homeassistant.helpers.typing import ConfigType
 from wyoming.server import AsyncTcpServer
 
 from .bridge import BridgeHandler
 from .const import (
+    ATTR_PERSONALITY,
     CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
     CONF_STT_ENTITY,
     DOMAIN,
     SERVICE_ROTATE,
+    SERVICE_SET_PERSONALITY,
 )
 from .conversation import PersonalityRouter
 from .frontend import async_setup as async_setup_frontend
@@ -71,8 +75,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def rotate(call: ServiceCall) -> None:
         await router.rotate()
 
+    async def set_personality(call: ServiceCall) -> None:
+        await router.select_personality(call.data[ATTR_PERSONALITY])
+
     hass.services.async_register(DOMAIN, SERVICE_ROTATE, rotate)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_PERSONALITY,
+        set_personality,
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_PERSONALITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=Platform.CONVERSATION,
+                        include_entities=router.backends,
+                    )
+                )
+            }
+        ),
+    )
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, SERVICE_ROTATE))
+    entry.async_on_unload(
+        lambda: hass.services.async_remove(DOMAIN, SERVICE_SET_PERSONALITY)
+    )
     return True
 
 

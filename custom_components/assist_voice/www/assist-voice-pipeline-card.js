@@ -100,7 +100,7 @@
         .map((backend) => {
           if (!backend) return "";
           const isCurrent = backend.entity_id === currentBackend.entity_id;
-          return `<button class="backend ${isCurrent ? "current" : ""}" type="button" data-entity="${escapeHtml(backend.entity_id)}">${escapeHtml(backend.name)}${isCurrent ? " · current" : ""}</button>`;
+          return `<button class="backend ${isCurrent ? "current" : ""}" type="button" data-personality="${escapeHtml(backend.entity_id)}" aria-pressed="${isCurrent}" title="Select ${escapeHtml(backend.name)}">${escapeHtml(backend.name)}${isCurrent ? " · current" : ""}</button>`;
         })
         .join("");
 
@@ -198,6 +198,14 @@
             <p class="note">Personality rotation affects new sessions only; the TTS engine and voice remain those configured on the Assist pipeline.</p>
           </div>
         </ha-card>`;
+
+      this.shadowRoot.querySelectorAll("[data-personality]").forEach((element) => {
+        element.addEventListener("click", () => {
+          this._hass.callService("assist_voice", "set_personality", {
+            personality: element.dataset.personality,
+          });
+        });
+      });
 
       this.shadowRoot.querySelectorAll("[data-entity]").forEach((element) => {
         element.addEventListener("click", () => {

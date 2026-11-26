@@ -1,7 +1,9 @@
 import asyncio
 
+import pytest
 from homeassistant.components import conversation
 from homeassistant.core import Context
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent
 from homeassistant.setup import async_setup_component
 
@@ -65,6 +67,19 @@ async def test_rotation_sessions_and_prompt(hass, entry, socket_enabled):
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.runtime_data.router.current == "agent_b"
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_select_personality_rejects_unconfigured_backend(
+    hass, entry, socket_enabled
+):
+    assert await async_setup_component(hass, "conversation", {})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    with pytest.raises(HomeAssistantError, match="not a configured personality"):
+        await entry.runtime_data.router.select_personality("agent_c")
+
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

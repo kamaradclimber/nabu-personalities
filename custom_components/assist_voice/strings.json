@@ -53,6 +53,16 @@
     "rotate": {
       "name": "Rotate personality",
       "description": "Randomly select a different configured personality for new conversations."
+    },
+    "set_personality": {
+      "name": "Set personality",
+      "description": "Select a configured personality for new conversations.",
+      "fields": {
+        "personality": {
+          "name": "Personality",
+          "description": "Conversation entity to use for new conversations."
+        }
+      }
     }
   }
 }

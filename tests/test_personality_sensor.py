@@ -28,7 +28,9 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     card_response = await client.get("/api/assist_voice/pipeline-card.js")
     assert card_response.status == 200
     assert "javascript" in card_response.content_type
-    assert "assist-voice-pipeline-card" in await card_response.text()
+    card_source = await card_response.text()
+    assert "assist-voice-pipeline-card" in card_source
+    assert '"set_personality"' in card_source
 
     entity_registry = er.async_get(hass)
     sensor_id = entity_registry.async_get_entity_id(
@@ -96,6 +98,19 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     assert state is not None
     assert state.state == "Updated Two"
     assert state.attributes["backend_names"][backend_ids[1]] == "Updated Two"
+
+    await hass.services.async_call(
+        DOMAIN,
+        "set_personality",
+        {"personality": backend_ids[0]},
+        blocking=True,
+    )
+    state = hass.states.get(sensor_id)
+    assert state is not None
+    assert state.state == backend_names[0]
+    assert state.attributes["current_backend"] == backend_ids[0]
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    assert entry.runtime_data.router.current == backend_ids[0]
 
     sensor_entry = entity_registry.async_get(sensor_id)
     assert sensor_entry is not None
