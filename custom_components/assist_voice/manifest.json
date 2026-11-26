@@ -1,7 +1,7 @@
 {
   "domain": "assist_voice",
   "name": "Assist Voice Bridge and Router",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "config_flow": true,
   "documentation": "https://github.com/kamaradclimber/nabu-personalities",
   "dependencies": [
