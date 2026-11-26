@@ -19,6 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.storage import Store
 
 from .const import CONF_BACKENDS, DOMAIN
+from .device import assist_voice_device_info
 
 IN_ROUTER: ContextVar[bool] = ContextVar("assist_voice_in_router", default=False)
 SESSION_TTL = 24 * 60 * 60
@@ -51,6 +52,7 @@ class PersonalityRouter(conversation.ConversationEntity):
 
     def __init__(self, hass: HomeAssistant, entry) -> None:
         self._attr_unique_id = f"{entry.entry_id}-router"
+        self._attr_device_info = assist_voice_device_info(entry.entry_id)
         self.backends = list(entry.data[CONF_BACKENDS])
         self.current: str = self.backends[0]
         self.store: Store = Store(

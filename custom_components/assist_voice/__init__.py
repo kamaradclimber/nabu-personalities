@@ -24,7 +24,12 @@ from .const import (
 from .conversation import PersonalityRouter
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-PLATFORMS = [Platform.CONVERSATION, Platform.SENSOR, Platform.STT]
+PLATFORMS = [
+    Platform.BUTTON,
+    Platform.CONVERSATION,
+    Platform.SENSOR,
+    Platform.STT,
+]
 
 
 @dataclass

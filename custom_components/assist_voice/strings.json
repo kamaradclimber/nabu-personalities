@@ -35,6 +35,11 @@
     }
   },
   "entity": {
+    "button": {
+      "rotate_personality": {
+        "name": "Rotate personality"
+      }
+    },
     "sensor": {
       "current_personality": {
         "name": "Current personality"

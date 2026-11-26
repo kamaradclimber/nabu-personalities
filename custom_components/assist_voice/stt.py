@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_SPEAKER_STT,
     GUARDED_STT_ENTITY,
 )
+from .device import assist_voice_device_info
 
 _LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_SECONDS = 120
@@ -41,6 +42,7 @@ class GuardedSpeakerStt(stt.SpeechToTextEntity):
 
     def __init__(self, entry: ConfigEntry) -> None:
         self._attr_unique_id = f"{entry.entry_id}-guarded-stt"
+        self._attr_device_info = assist_voice_device_info(entry.entry_id)
         self.entity_id = GUARDED_STT_ENTITY
         self._target_id = entry.data.get(CONF_SPEAKER_STT) or DEFAULT_SPEAKER_STT
         self._response_timeout = entry.data.get(

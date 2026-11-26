@@ -1,26 +1,74 @@
-"""The current-personality sensor reflects router selection changes."""
+"""Assist Voice device controls and personality diagnostics."""
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.setup import async_setup_component
 
+from custom_components.assist_voice.const import DOMAIN
 
-async def test_sensor_tracks_current_personality(hass, entry, socket_enabled):
+
+async def test_sensor_tracks_named_personality_and_device_entities(
+    hass, entry, socket_enabled
+):
     assert await async_setup_component(hass, "conversation", {})
+    backend_ids = ["conversation.personality_one", "conversation.personality_two"]
+    backend_names = ["Personality One", "Personality Two"]
+    for entity_id, name in zip(backend_ids, backend_names, strict=True):
+        hass.states.async_set(entity_id, "unknown", {"friendly_name": name})
+
     entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "backends": backend_ids}
+    )
     assert await hass.config_entries.async_setup(entry.entry_id)
 
-    sensor_id = er.async_get(hass).async_get_entity_id(
-        "sensor", "assist_voice", f"{entry.entry_id}-personality"
+    entity_registry = er.async_get(hass)
+    sensor_id = entity_registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}-personality"
+    )
+    button_id = entity_registry.async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}-rotate-personality"
     )
     assert sensor_id is not None
-    state = hass.states.get(sensor_id)
-    assert state is not None
-    assert state.state == "agent_a"
-    assert state.attributes["backends"] == ["agent_a", "agent_b"]
+    assert button_id is not None
 
-    await hass.services.async_call("assist_voice", "rotate", {}, blocking=True)
     state = hass.states.get(sensor_id)
     assert state is not None
-    assert state.state == entry.runtime_data.router.current == "agent_b"
+    assert state.state == backend_names[0]
+    assert state.attributes["current_backend"] == backend_ids[0]
+    assert state.attributes["backends"] == backend_ids
+    assert state.attributes["backend_names"] == dict(zip(backend_ids, backend_names))
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": button_id}, blocking=True
+    )
+    state = hass.states.get(sensor_id)
+    assert state is not None
+    assert state.state == backend_names[1]
+    assert state.attributes["current_backend"] == backend_ids[1]
+
+    # Display-name changes on configured backends refresh diagnostic attributes.
+    hass.states.async_set(backend_ids[1], "unknown", {"friendly_name": "Updated Two"})
+    state = hass.states.get(sensor_id)
+    assert state is not None
+    assert state.state == "Updated Two"
+    assert state.attributes["backend_names"][backend_ids[1]] == "Updated Two"
+
+    sensor_entry = entity_registry.async_get(sensor_id)
+    assert sensor_entry is not None
+    assert sensor_entry.entity_category == EntityCategory.DIAGNOSTIC
+
+    device_registry = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+    assert len(devices) == 1
+    device = devices[0]
+    assert device.entry_type == DeviceEntryType.SERVICE
+    config_entry_entities = er.async_entries_for_config_entry(
+        entity_registry, entry.entry_id
+    )
+    assert len(config_entry_entities) == 4
+    assert {entity.device_id for entity in config_entry_entities} == {device.id}
 
     assert await hass.config_entries.async_unload(entry.entry_id)
