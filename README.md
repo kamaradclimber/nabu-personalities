@@ -27,6 +27,8 @@ The guarded STT entity applies a 120-second maximum request timeout and defaults
 
 All Assist Voice entities are grouped under one **Assist Voice** service device. Use the **Rotate personality** button or `assist_voice.rotate` to randomly select a different configured backend. Clicking a personality chip in the pipeline card, or calling `assist_voice.set_personality` with the `personality` conversation entity ID, selects a specific backend. Both actions persist across restarts.
 
+Both services accept a target: the Assist Voice device, or any of its entities. Automations that use the target are shown as related on the device page; without a target every configured Assist Voice device is addressed instead. A target that resolves to no Assist Voice device fails the call instead of rotating something else.
+
 The **Current personality** diagnostic sensor displays the selected backend's friendly name. Its attributes expose the selected backend ID, all configured backend IDs, and an ID-to-name mapping. Existing sessions stay with their original backend; session mappings are in memory, so start a new conversation after restarting HA or reloading the integration. Changing personality does not change the TTS engine or voice.
 
 ## Pipeline visualization

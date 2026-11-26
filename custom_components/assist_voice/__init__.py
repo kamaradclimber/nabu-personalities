@@ -8,11 +8,17 @@ from functools import partial
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.const import ENTITY_MATCH_ALL, Platform
+from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
+from homeassistant.helpers.target import (
+    TargetSelection,
+    async_extract_referenced_entity_ids,
+)
 from homeassistant.helpers.typing import ConfigType
 from wyoming.server import AsyncTcpServer
 
@@ -50,6 +56,63 @@ class Runtime:
     router: PersonalityRouter
 
 
+def _targeted_runtimes(hass: HomeAssistant, call: ServiceCall) -> list[Runtime]:
+    """Resolve a service call target to the Assist Voice entries it addresses.
+
+    Services are registered once for all loaded entries. A call without a
+    target addresses every entry; a call with a target only the entries whose
+    service device or entities are referenced.
+    """
+    runtimes: dict[str, Runtime] = hass.data.get(DOMAIN, {})
+    target = TargetSelection(call.data)
+    if not target.has_any_target or ENTITY_MATCH_ALL in target.entity_ids:
+        return list(runtimes.values())
+
+    selected = async_extract_referenced_entity_ids(hass, target)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    entry_ids: set[str] = set()
+    for device_id in selected.referenced_devices:
+        if (device := device_registry.async_get(device_id)) is not None:
+            entry_ids.update(device.config_entries)
+    for entity_id in selected.referenced | selected.indirectly_referenced:
+        if (entity := entity_registry.async_get(entity_id)) is not None and (
+            entity.config_entry_id is not None
+        ):
+            entry_ids.add(entity.config_entry_id)
+    return [
+        runtimes[entry_id] for entry_id in sorted(entry_ids) if entry_id in runtimes
+    ]
+
+
+async def _async_rotate(call: ServiceCall) -> None:
+    """Rotate the personality of each targeted Assist Voice entry."""
+    runtimes = _targeted_runtimes(call.hass, call)
+    if not runtimes:
+        raise ServiceValidationError(
+            "No Assist Voice device is targeted; target the Assist Voice device"
+            " or one of its entities"
+        )
+    for runtime in runtimes:
+        await runtime.router.rotate()
+
+
+async def _async_set_personality(call: ServiceCall) -> None:
+    """Select the personality of each targeted Assist Voice entry."""
+    personality = call.data[ATTR_PERSONALITY]
+    runtimes = _targeted_runtimes(call.hass, call)
+    routers = [
+        runtime.router for runtime in runtimes if personality in runtime.router.backends
+    ]
+    if not routers:
+        raise ServiceValidationError(
+            f"{personality} is not a configured personality of a targeted"
+            " Assist Voice device"
+        )
+    for router in routers:
+        await router.select_personality(personality)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     router = PersonalityRouter(hass, entry)
     await router.load()
@@ -72,32 +135,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await server.stop()
         raise
 
-    async def rotate(call: ServiceCall) -> None:
-        await router.rotate()
+    runtimes: dict[str, Runtime] = hass.data.setdefault(DOMAIN, {})
+    runtimes[entry.entry_id] = entry.runtime_data
 
-    async def set_personality(call: ServiceCall) -> None:
-        await router.select_personality(call.data[ATTR_PERSONALITY])
+    @callback
+    def _discard_runtime() -> None:
+        runtimes.pop(entry.entry_id, None)
+        if not runtimes:
+            hass.services.async_remove(DOMAIN, SERVICE_ROTATE)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_PERSONALITY)
 
-    hass.services.async_register(DOMAIN, SERVICE_ROTATE, rotate)
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SET_PERSONALITY,
-        set_personality,
-        schema=vol.Schema(
-            {
-                vol.Required(ATTR_PERSONALITY): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain=Platform.CONVERSATION,
-                        include_entities=router.backends,
-                    )
-                )
-            }
-        ),
-    )
-    entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, SERVICE_ROTATE))
-    entry.async_on_unload(
-        lambda: hass.services.async_remove(DOMAIN, SERVICE_SET_PERSONALITY)
-    )
+    entry.async_on_unload(_discard_runtime)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_ROTATE):
+        hass.services.async_register(DOMAIN, SERVICE_ROTATE, _async_rotate)
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_PERSONALITY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_PERSONALITY,
+            _async_set_personality,
+            schema=vol.Schema(
+                {
+                    vol.Required(ATTR_PERSONALITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=Platform.CONVERSATION)
+                    ),
+                    **cv.TARGET_SERVICE_FIELDS,
+                }
+            ),
+        )
     return True
 
 

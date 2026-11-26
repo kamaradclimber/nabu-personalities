@@ -1,9 +1,26 @@
 rotate:
   name: Rotate personality
-  description: Randomly select a different configured personality for new conversations.
+  description: >-
+    Randomly select a different configured personality for new conversations.
+    Target an Assist Voice device, or one of its entities, to rotate only that
+    device; without a target every configured Assist Voice device rotates.
+  target:
+    entity:
+      integration: assist_voice
+    device:
+      integration: assist_voice
 set_personality:
   name: Set personality
-  description: Select a configured personality for new conversations.
+  description: >-
+    Select a configured personality for new conversations. Target an Assist Voice
+    device, or one of its entities, to select only that device; without a target
+    the personality is selected on every configured Assist Voice device that
+    offers it.
+  target:
+    entity:
+      integration: assist_voice
+    device:
+      integration: assist_voice
   fields:
     personality:
       name: Personality
