@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "config_flow": true,
   "documentation": "https://github.com/kamaradclimber/nabu-personalities",
-  "dependencies": ["conversation", "stt"],
+  "dependencies": ["conversation", "sensor", "stt"],
   "requirements": ["wyoming==1.10.2"],
   "iot_class": "local_push"
 }

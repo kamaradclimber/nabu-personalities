@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from typing import Literal
@@ -12,7 +13,7 @@ from uuid import uuid4
 
 from homeassistant.components import conversation
 from homeassistant.const import MATCH_ALL
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.storage import Store
@@ -57,6 +58,7 @@ class PersonalityRouter(conversation.ConversationEntity):
         )
         self.sessions: dict[str, Session] = {}
         self.rotate_lock = asyncio.Lock()
+        self._personality_listeners: list[Callable[[], None]] = []
 
     async def load(self) -> None:
         saved = await self.store.async_load() or {}
@@ -71,6 +73,15 @@ class PersonalityRouter(conversation.ConversationEntity):
     def extra_state_attributes(self) -> dict:
         return {"current_backend": self.current, "backends": self.backends}
 
+    @callback
+    def async_add_personality_listener(self, listener: Callable[[], None]) -> None:
+        """Call the listener whenever the current personality changes."""
+        self._personality_listeners.append(listener)
+
+    @callback
+    def async_remove_personality_listener(self, listener: Callable[[], None]) -> None:
+        self._personality_listeners.remove(listener)
+
     async def rotate(self) -> None:
         async with self.rotate_lock:
             choices = [agent for agent in self.backends if agent != self.current]
@@ -83,6 +94,8 @@ class PersonalityRouter(conversation.ConversationEntity):
             await self.store.async_save({"backend": selected})
             self.current = selected
             self.async_write_ha_state()
+            for listener in self._personality_listeners:
+                listener()
 
     def _prune(self, *, for_insert: bool = False) -> None:
         now = time.monotonic()

@@ -34,6 +34,13 @@
       "already_configured": "Assist Voice is already configured."
     }
   },
+  "entity": {
+    "sensor": {
+      "current_personality": {
+        "name": "Current personality"
+      }
+    }
+  },
   "services": {
     "rotate": {
       "name": "Rotate personality",
