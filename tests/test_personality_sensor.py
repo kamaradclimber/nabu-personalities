@@ -31,6 +31,7 @@ async def test_sensor_tracks_named_personality_and_device_entities(
     card_source = await card_response.text()
     assert "assist-voice-pipeline-card" in card_source
     assert '"set_personality"' in card_source
+    assert '"assist_voice", "rotate"' in card_source
 
     entity_registry = er.async_get(hass)
     sensor_id = entity_registry.async_get_entity_id(

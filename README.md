@@ -1,54 +1,66 @@
 # Assist Voice Bridge and Router
 
-A small, independent Home Assistant custom integration containing:
+A personal Home Assistant integration built for my voice setup. It bridges HA speech-to-text through Wyoming, provides a timeout-protected entity for the Assist Speaker ID integration, and routes conversations to a selectable personality.
 
-- A Wyoming STT server backed by an existing HA STT entity (e.g. NabuCasa).
-- A timeout-protected STT entity delegating to the upstream Speaker ID integration.
-- A conversation entity routing new conversations to a selected existing agent, with an `assist_voice.rotate` action to choose a different personality.
+This is intended for my own use, not presented as a generic, production-supported integration. If others are interested, PRs are welcome; I can make it more generic around concrete use cases.
 
-Designed to work with the **unmodified** [Assist Speaker ID](https://github.com/witold-gren/home-assistant-assist-speaker-id) integration and its separately deployed Wyoming service. Point Speaker ID's STT upstream at this bridge and its speaker-aware conversation agent at the personality router.
+## How it fits together
 
-**Development status:** not yet production-validated. Do not deploy without reviewing the deployment plan, image, security and remaining tests.
+- The Wyoming bridge proxies requests to a configured Home Assistant STT entity.
+- The guarded STT entity delegates to the configured Speaker ID STT entity.
+- The personality router delegates conversations to one of the configured conversation entities.
+- The pipeline topology sensor and optional Lovelace card show the preferred Assist pipeline and these handoffs.
 
-## Configuration
+This is designed to work with the unmodified [Assist Speaker ID](https://github.com/witold-gren/home-assistant-assist-speaker-id) integration and its separately deployed server.
 
-Add Assist Voice as an integration and select an HA STT entity and one or more conversation entities. The default listener is `0.0.0.0:10352`. Reconfigure the integration to change settings. Configure the upstream speaker-aware agent to use the personality router as its target. Do not select the speaker-aware agent itself as a router backend, or Speaker ID STT as the bridge target.
+## Setup
 
-Select `stt.assist_voice_speaker_id` as the test pipeline's STT, not the upstream entity directly. It delegates to `stt.speaker_id_speech_to_text` (or a separately selected, renamed Speaker ID entity). It permits at most 120 seconds for a complete request and defaults to 30 seconds for the response after audio ends. The latter is configurable from 5 to 90 seconds. On timeout it returns an STT error, not a transcript or automatic fallback.
+1. Add Assist Voice and select the upstream HA STT entity and one or more conversation backends. The Wyoming listener defaults to `0.0.0.0:10352`.
+2. Configure the Speaker ID integration to use this Wyoming bridge for STT, and point its conversation agent at the Assist Voice personality router.
+3. In the Assist pipeline, use `stt.assist_voice_speaker_id` for STT and the Speaker ID conversation agent for conversation handling. Reconfigure Assist Voice to change its selected entities or listener settings.
 
-Invoke `assist_voice.rotate` to randomly choose a different backend, or `assist_voice.set_personality` with a configured conversation entity ID to choose one directly. Both actions persist across restarts. Rotation requires at least two configured agents. Assist Voice's entities are grouped under one **Assist Voice** service device. Its **Rotate personality** button selects a different backend for new conversations, and the diagnostic **Current personality** sensor reports the selected backend's friendly name. Sensor attributes include the selected backend entity ID (`current_backend`), all configured backend entity IDs (`backends`), and a mapping from backend IDs to friendly names (`backend_names`). Existing conversations normally remain on their original agent until they expire (24 hours), are evicted, or HA/the integration restarts; after that, start a new conversation. HA-supplied session IDs that are no longer in the router's memory may be treated as new conversations. Agent failures do not trigger an automatic switch. Router attributes also show the selected backend and eligible backends.
+Do not select Speaker ID STT as the bridge's upstream STT entity, or the Speaker ID conversation agent as a router backend; both would create a loop.
 
-The diagnostic **Voice pipeline topology** sensor visualizes Home Assistant's preferred Assist pipeline and the integration's STT/personality routes. It refreshes the preferred pipeline view once a minute. This prototype does not discover pipelines assigned individually to satellites.
+The guarded STT entity applies a 120-second maximum request timeout and defaults to 30 seconds waiting for a result after audio ends. That response timeout can be configured from 5 to 90 seconds. A timeout returns an STT error, never a fallback transcript.
 
-For a clickable diagram, first add the card resource in **Settings → Dashboards → Resources**:
+## Personality controls
+
+All Assist Voice entities are grouped under one **Assist Voice** service device. Use the **Rotate personality** button or `assist_voice.rotate` to randomly select a different configured backend. Clicking a personality chip in the pipeline card, or calling `assist_voice.set_personality` with the `personality` conversation entity ID, selects a specific backend. Both actions persist across restarts.
+
+The **Current personality** diagnostic sensor displays the selected backend's friendly name. Its attributes expose the selected backend ID, all configured backend IDs, and an ID-to-name mapping. Existing sessions stay with their original backend; session mappings are in memory, so start a new conversation after restarting HA or reloading the integration. Changing personality does not change the TTS engine or voice.
+
+## Pipeline visualization
+
+The **Voice pipeline topology** diagnostic sensor describes Home Assistant's preferred Assist pipeline and refreshes once a minute. It does not discover pipelines assigned individually to satellites.
+
+To use the clickable Lovelace card, add this resource under **Settings → Dashboards → Resources**:
 
 - URL: `/api/assist_voice/pipeline-card.js`
 - Resource type: **JavaScript Module**
 
-Then add a dashboard card with:
+Then add this card to a dashboard:
 
 ```yaml
 type: custom:assist-voice-pipeline-card
 ```
 
-The stage nodes open the relevant entity's more-info panel; clicking a personality chip selects that backend via `assist_voice.set_personality`. The diagram calls out the timeout limits, shows that the Speaker ID integration calls its server over HTTP, and traces the server's Wyoming handoff to the configured HA STT provider. The Rotate personality button works directly from the diagram. If the preferred pipeline doesn't use Assist Voice's guarded STT entity, that route is shown as inactive.
-
-The integration's icon and logo are in `custom_components/assist_voice/brand/`. `uv run --with pillow python custom_components/assist_voice/brand/generate.py` regenerates the current simple waveform artwork.
+Pipeline stage nodes open entity details. Personality chips select a backend, and the card's button rotates to a random one. The STT handoff shows the timeout limits, the Speaker ID integration's HTTP call to its server, and the server's Wyoming handoff to the configured HA STT provider. The integration's brand assets live in `custom_components/assist_voice/brand/`.
 
 ## Security and limitations
 
-Wyoming has no authentication or encryption. The listener exposes your configured STT entity to network clients; restrict access at the network level and do not expose it to the Internet. Stream size, duration and concurrency are limited. Speaker ID's HTTP API needs its own token and network restrictions.
+Wyoming has no authentication or encryption. Restrict access to the listener at the network level and never expose it to the Internet. The Speaker ID HTTP API also needs its own token and network restrictions.
 
-A test pipeline is essential: the upstream Speaker ID STT entity may not carry the target provider's audio-processing preferences through to the satellite. VAD and transcription results can therefore differ from direct NabuCasa STT. At upstream Speaker ID v0.3.0 (`e6e5e5c`), its STT client ignores Wyoming error events and can wait indefinitely if the upstream STT fails. The protected STT entity bounds this wait, and a local end-to-end failure test verifies the mitigation; the upstream issue itself remains unfixed. Very short audio can also trigger an upstream VAD indexing exception. The bridge doesn't provide failover. The router doesn't advertise streaming support. Changing personalities doesn't change the pipeline's TTS voice. Prefer-local-intent handling may bypass the router.
+Test the complete pipeline: audio-processing preferences may not pass through the Speaker ID STT entity. The integration provides no failover, the router does not advertise streaming support, and Prefer Local Intents may bypass the router. At the tested Speaker ID v0.3.0 revision, its STT client ignores Wyoming error events; the guarded entity bounds the resulting wait. Very short audio may also trigger an upstream VAD error. This setup has not been production-validated.
 
 ## Development
 
-Python 3.14; tests use Home Assistant's official `pytest-homeassistant` package pinned to 2026.11.2. For the optional upstream proxy and pipeline tests, point `ASSIST_SPEAKER_SOURCE` at a checkout of upstream v0.3.0 commit `e6e5e5ce80861f2ef8f4bc84525744abec7de0c2`.
+Python 3.14; tests use Home Assistant and `pytest-homeassistant` pinned to 2026.11.2.
 
 ```sh
 uv venv --python 3.14
 uv pip install -r requirements-test.txt
-ASSIST_SPEAKER_SOURCE=~/github/witold-gren/home-assistant-assist-speaker-id uv run pytest
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run pytest \
+  -p pytest_homeassistant.bootstrap -p pytest_asyncio.plugin -p pytest_socket
 ```
 
-The deployment plans and Kubernetes manifest live separately in `kamaradclimber/nomad-infrastructure/home-assistant/`.
+For optional upstream Speaker ID proxy/pipeline tests, set `ASSIST_SPEAKER_SOURCE` to a checkout of v0.3.0 commit `e6e5e5ce80861f2ef8f4bc84525744abec7de0c2` before running the test command.

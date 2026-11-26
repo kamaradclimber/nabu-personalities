@@ -24,7 +24,6 @@ from .const import (
     DEFAULT_LISTEN_PORT,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_SPEAKER_STT,
-    DOMAIN,
     GUARDED_STT_ENTITY,
 )
 from .conversation import PersonalityRouter
@@ -207,12 +206,6 @@ class PipelineTopologySensor(SensorEntity):
                         self.hass, self._entry.data[CONF_STT_ENTITY]
                     ),
                 },
-                "rotate_button": _entity_details(
-                    self.hass,
-                    er.async_get(self.hass).async_get_entity_id(
-                        "button", DOMAIN, f"{self._entry.entry_id}-rotate-personality"
-                    ),
-                ),
                 "personality_router": {
                     "entity": _entity_details(self.hass, self._router.entity_id),
                     "pipeline_uses_router_directly": (

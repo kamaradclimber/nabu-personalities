@@ -55,7 +55,6 @@
       const stt = findStage("Speech-to-text");
       const conversation = findStage("Conversation");
       const tts = findStage("Text-to-speech");
-      const rotateButton = voice.rotate_button?.entity_id;
       const detailsEntity = topologyId;
 
       const node = ({
@@ -150,7 +149,7 @@
               <h2>${escapeHtml(attrs.pipeline_name || state.state || "Assist pipeline")}</h2>
               <div class="subtitle">${escapeHtml(attrs.pipeline_language || "")}</div>
             </div>
-            <button class="rotate" type="button" ${rotateButton ? "" : "disabled"}>Rotate personality</button>
+            <button class="rotate" type="button" ${backends.length > 1 ? "" : "disabled"}>Rotate personality</button>
           </div>
 
           <h3>Assist pipeline</h3>
@@ -223,9 +222,7 @@
       });
 
       this.shadowRoot.querySelector(".rotate")?.addEventListener("click", () => {
-        if (rotateButton) {
-          this._hass.callService("button", "press", { entity_id: rotateButton });
-        }
+        this._hass.callService("assist_voice", "rotate", {});
       });
     }
   }
