@@ -1,8 +1,6 @@
 """Generate the placeholder brands icon/logo for the Assist Voice integration.
 
-Outputs icon.png (256x256) and logo.png (512x512) into
-custom_integrations/assist_voice/, ready for a PR to
-https://github.com/home-assistant/brands.
+Outputs icon.png (256x256) and logo.png (512x512) alongside this script.
 """
 
 from __future__ import annotations
@@ -11,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-OUT = Path(__file__).parent / "custom_integrations" / "assist_voice"
+OUT = Path(__file__).parent
 BG = (44, 47, 110, 255)  # deep indigo
 FG = (232, 234, 246, 255)  # near-white
 ACCENT = (255, 159, 67, 255)  # orange accent
