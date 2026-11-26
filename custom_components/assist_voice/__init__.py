@@ -94,7 +94,7 @@ async def _async_rotate(call: ServiceCall) -> None:
             " or one of its entities"
         )
     for runtime in runtimes:
-        await runtime.router.rotate()
+        await runtime.router.rotate(call.context)
 
 
 async def _async_set_personality(call: ServiceCall) -> None:
@@ -110,7 +110,7 @@ async def _async_set_personality(call: ServiceCall) -> None:
             " Assist Voice device"
         )
     for router in routers:
-        await router.select_personality(personality)
+        await router.select_personality(personality, call.context)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

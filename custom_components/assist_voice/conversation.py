@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from homeassistant.components import conversation
 from homeassistant.const import MATCH_ALL
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Context, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.storage import Store
@@ -60,7 +60,7 @@ class PersonalityRouter(conversation.ConversationEntity):
         )
         self.sessions: dict[str, Session] = {}
         self.rotate_lock = asyncio.Lock()
-        self._personality_listeners: list[Callable[[], None]] = []
+        self._personality_listeners: list[Callable[[Context | None], None]] = []
 
     async def load(self) -> None:
         saved = await self.store.async_load() or {}
@@ -76,15 +76,19 @@ class PersonalityRouter(conversation.ConversationEntity):
         return {"current_backend": self.current, "backends": self.backends}
 
     @callback
-    def async_add_personality_listener(self, listener: Callable[[], None]) -> None:
+    def async_add_personality_listener(
+        self, listener: Callable[[Context | None], None]
+    ) -> None:
         """Call the listener whenever the current personality changes."""
         self._personality_listeners.append(listener)
 
     @callback
-    def async_remove_personality_listener(self, listener: Callable[[], None]) -> None:
+    def async_remove_personality_listener(
+        self, listener: Callable[[Context | None], None]
+    ) -> None:
         self._personality_listeners.remove(listener)
 
-    async def rotate(self) -> None:
+    async def rotate(self, context: Context | None = None) -> None:
         """Select a random alternative personality for new conversations."""
         async with self.rotate_lock:
             choices = [agent for agent in self.backends if agent != self.current]
@@ -92,27 +96,35 @@ class PersonalityRouter(conversation.ConversationEntity):
                 raise HomeAssistantError(
                     "At least two different personalities are required to rotate"
                 )
-            await self._async_select_personality(secrets.choice(choices))
+            await self._async_select_personality(secrets.choice(choices), context)
 
-    async def select_personality(self, backend: str) -> None:
+    async def select_personality(
+        self, backend: str, context: Context | None = None
+    ) -> None:
         """Select a configured backend for new conversations."""
         async with self.rotate_lock:
             if backend not in self.backends:
                 raise HomeAssistantError(
                     f"{backend} is not a configured personality backend"
                 )
-            await self._async_select_personality(backend)
+            await self._async_select_personality(backend, context)
 
-    async def _async_select_personality(self, backend: str) -> None:
+    async def _async_select_personality(
+        self, backend: str, context: Context | None
+    ) -> None:
         """Persist a selection before publishing the change to entities."""
         if backend == self.current:
             return
+        # Attribute the resulting state changes to the triggering call, so the
+        # logbook and device activity show what caused the personality change.
+        if context is not None:
+            self.async_set_context(context)
         # Persist first: a write failure must not result in an unrecorded selection.
         await self.store.async_save({"backend": backend})
         self.current = backend
         self.async_write_ha_state()
         for listener in self._personality_listeners:
-            listener()
+            listener(context)
 
     def _prune(self, *, for_insert: bool = False) -> None:
         now = time.monotonic()

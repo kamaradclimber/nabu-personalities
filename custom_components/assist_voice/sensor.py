@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.components import assist_pipeline
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import Context, Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -116,7 +116,10 @@ class CurrentPersonalitySensor(SensorEntity):
         self.async_write_ha_state()
 
     @callback
-    def _async_write_state(self) -> None:
+    def _async_write_state(self, context: Context | None = None) -> None:
+        # Attribute the state change to the call that selected the personality.
+        if context is not None:
+            self.async_set_context(context)
         self.async_write_ha_state()
 
 
@@ -233,7 +236,10 @@ class PipelineTopologySensor(SensorEntity):
         await super().async_will_remove_from_hass()
 
     @callback
-    def _async_write_state(self) -> None:
+    def _async_write_state(self, context: Context | None = None) -> None:
+        # Attribute the state change to the call that selected the personality.
+        if context is not None:
+            self.async_set_context(context)
         self.async_write_ha_state()
 
     async def async_update(self) -> None:

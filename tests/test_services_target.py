@@ -6,7 +6,7 @@ import socket
 
 import pytest
 from homeassistant.components import search
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import entity_sources as get_entity_sources
@@ -226,3 +226,44 @@ async def test_automation_with_target_is_linked_to_the_device(
     result = searcher.async_search(search.ItemType.DEVICE, device_id)
     assert "automation.rotate_linked" in result.get("automation", set())
     assert "automation.rotate_unlinked" not in result.get("automation", set())
+
+
+async def test_rotation_attributes_state_changes_to_the_call(
+    hass, entry, socket_enabled
+):
+    """Personality changes carry the calling context, so the logbook shows a cause."""
+    await _setup_entry(hass, entry)
+    sensor_id = "sensor.assist_voice"
+    router_id = "conversation.assist_voice_personality_router"
+
+    context = Context()
+    await hass.services.async_call(
+        DOMAIN, SERVICE_ROTATE, {}, blocking=True, context=context
+    )
+    assert entry.runtime_data.router.current == BACKENDS[1]
+    assert hass.states.get(sensor_id).context is context
+    assert hass.states.get(router_id).context is context
+
+    # The button press (an entity service call) propagates its context too.
+    button_context = Context()
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.assist_voice"},
+        blocking=True,
+        context=button_context,
+    )
+    assert hass.states.get(sensor_id).context is button_context
+    assert hass.states.get(router_id).context is button_context
+
+    # set_personality attributes as well.
+    set_context = Context()
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SET_PERSONALITY,
+        {"personality": BACKENDS[1]},
+        blocking=True,
+        context=set_context,
+    )
+    assert hass.states.get(sensor_id).context is set_context
+    assert hass.states.get(router_id).context is set_context

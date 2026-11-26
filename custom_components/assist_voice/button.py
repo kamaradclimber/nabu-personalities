@@ -40,4 +40,6 @@ class RotatePersonalityButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Select a different personality for future conversations."""
-        await self._router.rotate()
+        # async_press runs as an entity service call, which set the context of
+        # the call; pass it on so the personality change is attributed to it.
+        await self._router.rotate(self._context)
